@@ -50,7 +50,7 @@ class Immo24Client:
     CONTACT_API_URL = "https://api.mobile.immobilienscout24.de/expose/{}/contact"
     
     API_USER_AGENT = "ImmoScout24_1458_34_._"
-    API_CLIENT_ID = "2914dca0b3cf4271950abd8a7a01d87e"
+    #API_CLIENT_ID = "2914dca0b3cf4271950abd8a7a01d87e"
 
     def __init__(self, proxy_url: str = None):
         self.access_token = None
@@ -406,7 +406,7 @@ class Immo24Client:
             "User-Agent": self.API_USER_AGENT,
             "Accept": "application/json",
             "Accept-Language": "en",
-            "x_is24_client_id": self.API_CLIENT_ID,
+            #"x_is24_client_id": self.API_CLIENT_ID,
             "x-is24-feature": "presale",
             "Content-Type": "application/json",
             #"Authorization": f"Bearer {self.access_token}",
