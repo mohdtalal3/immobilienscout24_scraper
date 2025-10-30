@@ -569,7 +569,7 @@ class Immo24Client:
             else:
                 logger.error(f"❌ Failed to contact listing {expose_id}: {response.status_code}")
                 logger.error(f"   Response: {response.text[:500]}")
-                return True
+                return False
                 
         except Exception as e:
             logger.error(f"❌ Error contacting listing {expose_id}: {e}")
