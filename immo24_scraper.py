@@ -820,17 +820,32 @@ def run_scraper_for_account(account: dict, supabase: Client):
     contact_form['message'] = contact_message
     logger.info(f"📝 [{account['email']}] Using message from separate 'message' field: {contact_message[:50]}...")
     
+    # Load contacted IDs history (last 50) to prevent duplicates
+    contacted_ids_history = existing_listing_data.get('contacted_ids', [])
+    if not isinstance(contacted_ids_history, list):
+        contacted_ids_history = []
+    
+    logger.info(f"📋 [{account['email']}] Loaded {len(contacted_ids_history)} previously contacted IDs from history")
+    
     # Session was already validated above before searching, no need to check again
     logger.info(f"💬 [{account['email']}] Auto-contacting {len(new_offers)} new offers...")
     
     # Contact each offer
     contacted_count = 0
     failed_count = 0
+    skipped_count = 0
+    newly_contacted_ids = []
     
     for offer in new_offers:
         offer_id = offer.get('id')
         offer_title = offer.get('title', 'Unknown')
         offer_url = offer.get('url', '')
+        
+        # Check if already contacted (duplicate detection)
+        if offer_id in contacted_ids_history:
+            skipped_count += 1
+            logger.info(f"⏭️  [{account['email']}] Skipping offer {offer_id} (already contacted): {offer_title[:40]}...")
+            continue
         
         logger.info(f"📤 [{account['email']}] Contacting offer {offer_id}: {offer_title[:40]}...")
         logger.info(f"   🔗 URL: {offer_url}")
@@ -839,11 +854,32 @@ def run_scraper_for_account(account: dict, supabase: Client):
         
         if result:
             contacted_count += 1
+            newly_contacted_ids.append(offer_id)
             logger.info(f"   ✅ [{account['email']}] Successfully contacted offer {offer_id}")
         else:
             failed_count += 1
             logger.error(f"   ❌ [{account['email']}] Failed to contact offer {offer_id}")
         time.sleep(random.uniform(1, 2))
+    
+    # Update contacted_ids history (keep last 50)
+    if newly_contacted_ids:
+        # Merge new IDs with existing history
+        updated_contacted_ids = newly_contacted_ids + contacted_ids_history
+        # Keep only last 50 IDs
+        updated_contacted_ids = updated_contacted_ids[:50]
+        
+        # Update listing_data with new contacted_ids history
+        updated_listing_data['contacted_ids'] = updated_contacted_ids
+        
+        try:
+            supabase.table('accounts').update({
+                'listing_data': updated_listing_data
+            }).eq('id', account['id']).execute()
+            
+            logger.info(f"💾 [{account['email']}] Updated contacted_ids history: {len(updated_contacted_ids)} IDs stored")
+        except Exception as e:
+            logger.error(f"❌ [{account['email']}] Error updating contacted_ids history: {e}")
+    
     # Update the contacted_ads counter in configuration
     if contacted_count > 0:
         try:
@@ -860,7 +896,11 @@ def run_scraper_for_account(account: dict, supabase: Client):
         except Exception as e:
             logger.error(f"❌ [{account['email']}] Error updating contacted_ads counter: {e}")
     
-    logger.info(f"📊 [{account['email']}] Contact Summary: ✅ {contacted_count} | ❌ {failed_count}")
+    if skipped_count > 0:
+        logger.info(f"📊 [{account['email']}] Contact Summary: ✅ {contacted_count} | ❌ {failed_count} | ⏭️  {skipped_count} skipped (duplicates)")
+    else:
+        logger.info(f"📊 [{account['email']}] Contact Summary: ✅ {contacted_count} | ❌ {failed_count}")
+    
     logger.info(f"✅ [{account['email']}] Scraper completed successfully!")
     
     return True, len(new_offers)
