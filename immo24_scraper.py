@@ -757,7 +757,8 @@ def run_scraper_for_account(account: dict, supabase: Client):
         latest_str = latest_time_in_fetch.isoformat(timespec="seconds") if latest_time_in_fetch else None
         new_listing_data = {
             "last_latest": latest_str,
-            "offers": []
+            "offers": [],
+            "contacted_ids": []
         }
         
         supabase.table('accounts').update({
@@ -799,9 +800,11 @@ def run_scraper_for_account(account: dict, supabase: Client):
     )
     
     # FULLY REPLACE listing_data with ONLY new filtered listings
+    # Preserve contacted_ids history from existing data
     updated_listing_data = {
         "last_latest": newest_str,
-        "offers": new_offers
+        "offers": new_offers,
+        "contacted_ids": existing_listing_data.get('contacted_ids', [])
     }
     
     # Save to Supabase first
