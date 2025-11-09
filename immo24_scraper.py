@@ -438,13 +438,30 @@ class Immo24Client:
             result_list = data_json.get("resultListItems", [])
             
             extracted = []
+            skipped_paywall = 0
+            
             for item in result_list:
                 if item.get("type") != "EXPOSE_RESULT":
                     continue
                 
                 ad = item.get("item", {})
+                
+                # Skip listings that require Plus subscription
+                # Check if paywallListing exists and is active
+                paywall_listing = ad.get("paywallListing", {})
+                if paywall_listing and paywall_listing.get("active"):
+                    skipped_paywall += 1
+                    continue
+                
+                # Also check tags for paywall tag
+                tags = ad.get("tags", [])
+                has_paywall_tag = any(tag.get("tag") == "paywall" for tag in tags)
+                if has_paywall_tag:
+                    skipped_paywall += 1
+                    continue
+                
                 published_dt = self.parse_published_time(ad.get("published", ""))
-                # If we can’t parse, skip or mark as unknown
+                # If we can't parse, skip or mark as unknown
                 if not published_dt:
                     continue  # or set to now if you prefer: published_dt = datetime.now()
                 extracted.append({
@@ -457,7 +474,9 @@ class Immo24Client:
             # Sort by published datetime (latest first)
             extracted.sort(key=lambda x: datetime.fromisoformat(x["published"]), reverse=True)
             
-            logger.info(f"✅ Found {len(extracted)} listings")
+            if skipped_paywall > 0:
+                logger.info(f"🚫 Skipped {skipped_paywall} Plus subscription listings")
+            logger.info(f"✅ Found {len(extracted)} contactable listings")
             return extracted
             
         except Exception as e:
